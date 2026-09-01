@@ -1,12 +1,11 @@
 use bytes::BytesMut;
 use color_eyre::Result;
 use httparse::Status;
-use hyper::client;
-use tokio::{io::BufReader, net::TcpListener};
+use tokio::net::TcpListener;
 use tracing::{Instrument, Span, debug, error, info, info_span};
 
 pub async fn run(tcp: TcpListener) -> Result<()> {
-    use tokio::io::AsyncBufReadExt;
+    use tokio::io::AsyncReadExt;
 
     loop {
         let (mut client, client_addr) = tcp.accept().await?;
@@ -18,48 +17,41 @@ pub async fn run(tcp: TcpListener) -> Result<()> {
 
         tokio::spawn(
             async move {
-                let (client_read, _client_write) = client.split();
-                let mut client_read = BufReader::new(client_read);
+                let (mut client_read, _client_write) = client.split();
+
+                let mut blank_buf = BytesMut::with_capacity(1024);
+                let mut filled_buf = blank_buf.split();
+
+                debug!(
+                    blank_buf = blank_buf.capacity(),
+                    filled_buf = filled_buf.capacity()
+                );
 
                 loop {
-                    // TODO: Marche pas, parce qu'une fois `fill_buf` appeler, il renvoi toujours la même chose sans
-                    //       read à nouveau depuis son reader intern...
-                    let buf = match client_read.fill_buf().await {
+                    match client_read.read_buf(&mut blank_buf).await {
                         // socket closed
-                        Ok(&[]) => {
+                        Ok(0) => {
                             info!("Close connection");
                             return Ok::<_, color_eyre::Report>(());
                         }
-                        Ok(buf) => buf,
+                        Ok(n) => info!("Read {n} bytes"),
                         Err(e) => {
                             error!("failed to read from socket; err = {:?}", e);
                             return Ok(());
                         }
                     };
 
-                    {
-                        let mut headers = [httparse::EMPTY_HEADER; 64];
-                        let mut request = httparse::Request::new(&mut headers);
-                        let res = request.parse(buf)?;
+                    let new_data = blank_buf.split();
+                    filled_buf.unsplit(new_data);
 
-                        info!(?res);
+                    let mut headers = [httparse::EMPTY_HEADER; 64];
+                    let mut request = httparse::Request::new(&mut headers);
+                    let res = request.parse(&filled_buf)?;
 
-                        let amt;
-                        match res {
-                            Status::Complete(n) => {
-                                amt = n;
-                                debug!(?request);
-                            }
-                            Status::Partial => continue,
-                        }
-                        client_read.consume(amt);
+                    if matches!(res, Status::Complete(_)) {
+                        debug!(?request);
+                        break Ok(());
                     }
-
-                    // Write the data back
-                    // if let Err(e) = client.write_all(&blank_buf[0..n]).await {
-                    //     error!("failed to write to socket; err = {:?}", e);
-                    //     return Ok(());
-                    // }
                 }
             }
             .instrument(Span::current()),

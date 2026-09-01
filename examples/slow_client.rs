@@ -21,24 +21,13 @@ const CHUNK_DELAY: Duration = Duration::from_millis(700);
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    // La requête est découpée à des endroits volontairement pénibles : au
-    // milieu de la request-line, au milieu d'un nom de header, et le CRLF
-    // final arrive tout seul.
-    // let chunks: [&str; 6] = [
-    //     "GET / HT",
-    //     "TP/1.1\r\nHo",
-    //     "st: [::1]:8800\r\n",
-    //     "User-Ag",
-    //     "ent: rust\r\n",
-    //     "\r\n",
-    // ];
-
-    let chunks: [&str; 2] = [
+    let chunks: [&str; 6] = [
         "GET / HTTP/1.1\r\n",
-        "Host: [::1]:8800\r\n\r\n",
-        // "User-Ag",
-        // "ent: rust\r\n",
-        // "\r\n",
+        "Host: [::1]:8800\r\n",
+        "User-Ag",
+        "ent: rust\r\n",
+        "\r\nGET / HTTP/1.1\r\n",
+        "Host: you.fr\n\r\n\r",
     ];
 
     println!("Connexion à {ADDR}…");
