@@ -7,7 +7,10 @@ edition = "2024"
 bytes = "1.12.1"
 color-eyre = "0.6.5"
 dotenvy = "0.15.7"
+futures = "0.3.34"
+http = "1.5.0"
 httparse = "1.10.1"
 tokio = { version = "1.53.1", features = ["full"] }
+tower = "0.5.3"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
