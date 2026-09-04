@@ -21,13 +21,12 @@ const CHUNK_DELAY: Duration = Duration::from_millis(700);
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let chunks: [&str; 6] = [
-        "GET / HTTP/1.1\r\n",
+    let chunks: [&str; 5] = [
+        "POST / HTTP/1.1\r\n",
         "Host: [::1]:8800\r\n",
         "User-Ag",
         "ent: rust\r\n",
-        "\r\nGET / HTTP/1.1\r\n",
-        "Host: you.fr\n\r\n\r",
+        "\r\nluigi",
     ];
 
     println!("Connexion à {ADDR}…");

@@ -1,3 +1,8 @@
+#![allow(warnings)]
+#![feature(impl_trait_in_assoc_type)]
+#![feature(impl_trait_in_fn_trait_return)]
+#![feature(impl_trait_in_bindings)]
+
 use color_eyre::Result;
 use dotenvy::dotenv;
 use tokio::net::TcpListener;
@@ -6,7 +11,8 @@ use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 mod app;
 mod config;
-mod http;
+mod error;
+mod services;
 
 #[tokio::main]
 async fn main() -> Result<()> {
