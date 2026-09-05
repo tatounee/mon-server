@@ -1,9 +1,3 @@
-//! Client de test qui envoie une requête HTTP en plusieurs morceaux, avec un
-//! délai entre chaque, pour voir comment le serveur réagit quand il ne reçoit
-//! pas tout d'un coup.
-//!
-//! Usage : `cargo run --example slow_client`
-
 use std::net::{Ipv6Addr, SocketAddr};
 use std::time::Duration;
 

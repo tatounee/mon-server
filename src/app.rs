@@ -1,21 +1,21 @@
 use std::fmt::{Debug, Display};
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use color_eyre::Result;
 use futures::future;
 use http::{Request, Response};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tower::Service;
+use tower::{Layer, Service, ServiceBuilder};
 use tracing::{Instrument, Span, debug, error, info, info_span};
 
 use crate::error::ServerError;
-use crate::services::{HelloService, HttpSerde};
+use crate::services::{ContentLengthLayer, HelloService, HttpSerde, HttpSerdeLayer};
 
 pub async fn serve<S, Res, Err>(mut client: TcpStream, _service: S) -> Result<()>
 where
     S: Service<Request<BytesMut>, Response = Response<Res>, Error = Err>,
-    Res: Display,
+    Res: Into<Bytes>,
     Err: Debug,
 {
     let (mut client_read, mut client_write) = client.split();
@@ -40,13 +40,14 @@ where
         let new_data = blank_buf.split();
         filled_buf.unsplit(new_data);
 
-        let mut http_serde = HttpSerde {
-            inner: HelloService,
-        };
+        let mut service = ServiceBuilder::new()
+            .layer(HttpSerdeLayer)
+            .layer(ContentLengthLayer)
+            .service(HelloService);
 
-        let ready = future::poll_fn(|cx| http_serde.poll_ready(cx)).await;
+        let ready = future::poll_fn(|cx| service.poll_ready(cx)).await;
         let mut response = match ready {
-            Ok(()) => http_serde.call(&mut filled_buf).await,
+            Ok(()) => service.call(&mut filled_buf).await,
             Err(_) => break Ok(()),
         };
 

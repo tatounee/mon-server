@@ -9,19 +9,19 @@ use bytes::{Bytes, BytesMut};
 use color_eyre::eyre::{ContextCompat, Report, WrapErr};
 use http::{HeaderName, HeaderValue, Method, Request, Response, StatusCode, Uri, Version};
 use httparse::{EMPTY_HEADER, Request as ParsedRequest, Status};
-use tower::Service;
+use tower::{Layer, Service};
 use tracing::debug;
 
 use crate::{error::ServerError, services::HelloService};
 
 pub struct HttpSerde<S> {
-    pub inner: S,
+    inner: S,
 }
 
 impl<'a, S, B> Service<&'a mut BytesMut> for HttpSerde<S>
 where
     S: Service<Request<BytesMut>, Error = Report, Response = Response<B>>,
-    B: Display,
+    B: Into<Bytes>,
 {
     type Response = Bytes;
 
@@ -44,6 +44,16 @@ where
 
             buf
         }
+    }
+}
+
+pub struct HttpSerdeLayer;
+
+impl<S> Layer<S> for HttpSerdeLayer {
+    type Service = HttpSerde<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        HttpSerde { inner }
     }
 }
 
@@ -112,7 +122,7 @@ fn request2request(request: ParsedRequest<'_, '_>) -> Result<Request<BytesMut>, 
     Ok(request)
 }
 
-pub fn serialize<B: Display>(response: Response<B>) -> Result<Bytes, Report> {
+pub fn serialize<B: Into<Bytes>>(response: Response<B>) -> Result<Bytes, Report> {
     let mut res_buf = BytesMut::new();
 
     let version = match response.version() {
@@ -139,7 +149,8 @@ pub fn serialize<B: Display>(response: Response<B>) -> Result<Bytes, Report> {
         ));
     }
 
-    res_buf.write_fmt(format_args!("\r\n{}", response.into_body()));
+    res_buf.write_str("\r\n");
+    res_buf.extend_from_slice(response.into_body().into().as_ref());
 
     Ok(res_buf.freeze())
 }
