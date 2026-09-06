@@ -5,16 +5,6 @@ use color_eyre::eyre::Report;
 use http::{HeaderValue, Request, Response, header};
 use tower::{Layer, Service};
 
-#[test]
-fn oui() {
-    use crate::services::HelloService;
-
-    let hello = HelloService;
-
-    let mut service = ContentLength { inner: hello };
-    service.call(todo!());
-}
-
 pub struct ContentLength<S> {
     inner: S,
 }

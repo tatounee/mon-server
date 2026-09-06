@@ -2,6 +2,7 @@ use std::fmt::{Debug, Display};
 
 use bytes::{Bytes, BytesMut};
 use color_eyre::Result;
+use color_eyre::eyre::{Context, Report};
 use futures::future;
 use http::{Request, Response};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -10,13 +11,32 @@ use tower::{Layer, Service, ServiceBuilder};
 use tracing::{Instrument, Span, debug, error, info, info_span};
 
 use crate::error::ServerError;
-use crate::services::{ContentLengthLayer, HelloService, HttpSerde, HttpSerdeLayer};
+use crate::services::{ContentLengthLayer, HttpSerde, HttpSerdeLayer, StaticFile};
 
-pub async fn serve<S, Res, Err>(mut client: TcpStream, _service: S) -> Result<()>
+pub async fn run(tcp: TcpListener) -> Result<()> {
+    let static_dir =
+        std::env::var("STATIC_DIR").wrap_err("reading STATIC_DIR environement variable")?;
+    let service = StaticFile::new(static_dir)?;
+
+    info!(static_dir = ?service.root());
+
+    loop {
+        let (client, client_addr) = tcp.accept().await?;
+
+        let span = info_span!("client", addr = %client_addr);
+        let _guard = span.enter();
+
+        info!("Open connection");
+
+        tokio::spawn(serve(client, service.clone()).instrument(Span::current()));
+    }
+}
+
+async fn serve<S>(mut client: TcpStream, service: S) -> Result<()>
 where
-    S: Service<Request<BytesMut>, Response = Response<Res>, Error = Err>,
-    Res: Into<Bytes>,
-    Err: Debug,
+    S: Service<Request<BytesMut>, Response = Response<Bytes>, Error = Report> + Clone,
+    // Res: Into<Bytes>,
+    // Err: Debug,
 {
     let (mut client_read, mut client_write) = client.split();
 
@@ -43,7 +63,7 @@ where
         let mut service = ServiceBuilder::new()
             .layer(HttpSerdeLayer)
             .layer(ContentLengthLayer)
-            .service(HelloService);
+            .service(service.clone());
 
         let ready = future::poll_fn(|cx| service.poll_ready(cx)).await;
         let mut response = match ready {
@@ -69,18 +89,5 @@ where
                 // client_write.write_all_buf(&mut Res).await;
             }
         }
-    }
-}
-
-pub async fn run(tcp: TcpListener) -> Result<()> {
-    loop {
-        let (client, client_addr) = tcp.accept().await?;
-
-        let span = info_span!("client", addr = %client_addr);
-        let _guard = span.enter();
-
-        info!("Open connection");
-
-        tokio::spawn(serve(client, HelloService).instrument(Span::current()));
     }
 }
