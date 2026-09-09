@@ -1,25 +1,27 @@
-use std::fmt::{Debug, Display};
-
 use bytes::{Bytes, BytesMut};
 use color_eyre::Result;
-use color_eyre::eyre::{Context, Report};
+use color_eyre::eyre::Report;
 use futures::future;
-use http::{Request, Response};
+use http::{Request, Response, StatusCode};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tower::{Layer, Service, ServiceBuilder};
-use tracing::{Instrument, Span, debug, error, info, info_span};
+use tower::{Service, ServiceBuilder};
+use tracing::{Instrument, Span, error, info, info_span};
 
 use crate::error::ServerError;
-use crate::services::{ContentLengthLayer, HttpSerde, HttpSerdeLayer, StaticFile};
+use crate::services::ContentLengthLayer;
+use crate::services::serde::{HttpSerdeLayer, serialize};
+// use crate::services::{ContentLengthLayer, HttpSerdeLayer};
+use crate::utils::basic_response;
 
-pub async fn run(tcp: TcpListener) -> Result<()> {
-    let static_dir =
-        std::env::var("STATIC_DIR").wrap_err("reading STATIC_DIR environement variable")?;
-    let service = StaticFile::new(static_dir)?;
-
-    info!(static_dir = ?service.root());
-
+pub async fn run<S, F>(tcp: TcpListener, service: S) -> Result<()>
+where
+    S: Service<Request<BytesMut>, Response = Response<Bytes>, Error = Report, Future = F>
+        + Clone
+        + Send
+        + 'static,
+    F: Send + 'static,
+{
     loop {
         let (client, client_addr) = tcp.accept().await?;
 
@@ -55,7 +57,7 @@ where
                 error!("failed to read from socket; err = {:?}", e);
                 return Ok(());
             }
-        };
+        }
 
         let new_data = blank_buf.split();
         filled_buf.unsplit(new_data);
@@ -66,14 +68,14 @@ where
             .service(service.clone());
 
         let ready = future::poll_fn(|cx| service.poll_ready(cx)).await;
-        let mut response = match ready {
+        let response = match ready {
             Ok(()) => service.call(&mut filled_buf).await,
             Err(_) => break Ok(()),
         };
 
         match response {
             Ok(mut response) => {
-                client_write.write_all_buf(&mut response).await;
+                client_write.write_all_buf(&mut response).await?;
                 break Ok(());
             }
             Err(err)
@@ -82,11 +84,14 @@ where
                     Some(&ServerError::PartialRequest)
                 ) =>
             {
+                #[allow(clippy::needless_continue)]
                 continue;
             }
             Err(err) => {
                 error!(?err);
-                // client_write.write_all_buf(&mut Res).await;
+                let response = basic_response(StatusCode::INTERNAL_SERVER_ERROR);
+                let mut response = serialize(response).unwrap();
+                client_write.write_all_buf(&mut response).await?;
             }
         }
     }

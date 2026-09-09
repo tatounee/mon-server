@@ -1,8 +1,5 @@
-use std::process::Output;
-
 use bytes::Bytes;
-use color_eyre::eyre::Report;
-use http::{HeaderValue, Request, Response, header};
+use http::{HeaderValue, Response, header};
 use tower::{Layer, Service};
 
 pub struct ContentLength<S> {

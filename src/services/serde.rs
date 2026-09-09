@@ -1,18 +1,14 @@
-use std::{
-    fmt::{Display, Write},
-    future::{Ready, ready},
-    str::FromStr,
-    task::Poll,
-};
+use std::fmt::Write;
+use std::str::FromStr;
+use std::task::Poll;
 
 use bytes::{Bytes, BytesMut};
 use color_eyre::eyre::{ContextCompat, Report, WrapErr};
-use http::{HeaderName, HeaderValue, Method, Request, Response, StatusCode, Uri, Version};
+use http::{HeaderName, HeaderValue, Method, Request, Response, Uri, Version};
 use httparse::{EMPTY_HEADER, Request as ParsedRequest, Status};
 use tower::{Layer, Service};
-use tracing::debug;
 
-use crate::{error::ServerError, services::HelloService};
+use crate::error::ServerError;
 
 pub struct HttpSerde<S> {
     inner: S,
@@ -40,9 +36,7 @@ where
 
         async move {
             let response = inner?.await?;
-            let buf = serialize(response);
-
-            buf
+            serialize(response)
         }
     }
 }
@@ -66,14 +60,14 @@ fn parse(buf: &mut BytesMut) -> Result<Request<BytesMut>, Report> {
         return Err(Report::new(ServerError::PartialRequest));
     };
 
-    let mut request = request2request(parsed)?;
+    let mut request = request2request(&parsed)?;
     let body = buf.split_off(cnt);
     *request.body_mut() = body;
 
     Ok(request)
 }
 
-fn request2request(request: ParsedRequest<'_, '_>) -> Result<Request<BytesMut>, Report> {
+fn request2request(request: &ParsedRequest<'_, '_>) -> Result<Request<BytesMut>, Report> {
     let method = request
         .method
         .context("missing method in request2request")
@@ -139,17 +133,17 @@ pub fn serialize<B: Into<Bytes>>(response: Response<B>) -> Result<Bytes, Report>
         version,
         response.status().as_u16(),
         response.status().canonical_reason().unwrap_or_default(),
-    ));
+    ))?;
 
     for (header_name, header_value) in response.headers() {
         res_buf.write_fmt(format_args!(
             "{}: {}\r\n",
             header_name,
             header_value.to_str().map_err(Report::new)?
-        ));
+        ))?;
     }
 
-    res_buf.write_str("\r\n");
+    res_buf.write_str("\r\n")?;
     res_buf.extend_from_slice(response.into_body().into().as_ref());
 
     Ok(res_buf.freeze())
