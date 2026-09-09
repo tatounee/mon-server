@@ -14,6 +14,7 @@ use crate::services::{HelloService, Router, StaticFile};
 mod app;
 mod config;
 mod error;
+mod multi_map;
 mod services;
 mod utils;
 
