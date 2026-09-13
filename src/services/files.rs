@@ -6,7 +6,7 @@ use http::{Method, Request, Response, StatusCode, Uri};
 use tokio::{fs::File, io::AsyncReadExt};
 use tower::Service;
 
-use crate::utils::basic_response;
+use crate::{services::DbHandler, typed_map::Value, utils::basic_response};
 
 /// How much room is reserved before each read when the file size is unknown
 /// (or when the file grew past the size reported by its metadata).
@@ -61,6 +61,25 @@ impl<B> Service<Request<B>> for StaticFile {
 
         async move {
             if req.method() != Method::GET {
+                if let Some(db) = req.extensions().get::<DbHandler>() {
+                    let mut fail = None;
+                    db.get::<StaticFile>(Value::Empty, |previous_fail| {
+                        fail = previous_fail.cloned();
+                    })
+                    .await;
+
+                    let new_fail = fail.unwrap_or(Value::U64(0)).u64().unwrap() + 1;
+
+                    db.insert::<StaticFile>(Value::Empty, Value::U64(new_fail))
+                        .await;
+
+                    let body = format!("Fail {new_fail} times");
+                    return Response::builder()
+                        .status(200)
+                        .body(Bytes::from(body))
+                        .map_err(Report::new);
+                }
+
                 return Ok(basic_response(StatusCode::METHOD_NOT_ALLOWED));
             }
 
@@ -104,10 +123,10 @@ impl<B> Service<Request<B>> for StaticFile {
                 }
             }
 
-            Ok(Response::builder()
+            Response::builder()
                 .status(StatusCode::OK)
                 .body(buf.freeze())
-                .unwrap())
+                .map_err(Report::new)
         }
     }
 }

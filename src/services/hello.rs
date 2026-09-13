@@ -1,7 +1,4 @@
-use std::{
-    future::{Ready, ready},
-    task::Poll,
-};
+use std::task::Poll;
 
 use bytes::{Bytes, BytesMut};
 use color_eyre::eyre::Report;
@@ -36,18 +33,16 @@ impl Service<Request<BytesMut>> for HelloService {
                         .await;
                 }
 
-                let body = format!("Get {}", name);
-                let body = Bytes::from(body);
-
+                let body = format!("Get {name}");
                 Response::builder()
                     .status(200)
-                    .body(body)
+                    .body(Bytes::from(body))
                     .map_err(Report::new)
             } else {
                 if let Some(db) = req.extensions().get::<DbHandler>() {
                     let mut name = None;
                     db.get::<HelloService>(Value::Empty, |previous_name| {
-                        name = previous_name.cloned()
+                        name = previous_name.cloned();
                     })
                     .await;
 

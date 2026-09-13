@@ -1,5 +1,3 @@
-use std::any::TypeId;
-use std::collections::HashMap;
 use std::mem;
 use std::sync::LazyLock;
 
@@ -43,6 +41,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct DatabaseLayer;
 
 impl<S> Layer<S> for DatabaseLayer {
@@ -70,6 +69,6 @@ impl DbHandler {
         C: 'static,
     {
         let db = (*STORAGE).read().await;
-        db.get::<C>(key, callback).await
+        db.get::<C>(key, callback).await;
     }
 }

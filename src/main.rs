@@ -2,7 +2,7 @@
 #![feature(trim_prefix_suffix)]
 #![feature(normalize_lexically)]
 #![warn(clippy::pedantic)]
-#![allow(warnings)]
+// #![allow(warnings)]
 
 use color_eyre::{Result, eyre::Context};
 use dotenvy::dotenv;
@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
     let (host, port) = config::from_env()?;
     info!("Starting application on http://[{host}]:{port}");
 
-    let listener = TcpListener::bind((host, port)).await.unwrap();
+    let listener = TcpListener::bind((host, port)).await?;
 
     let static_dir =
         std::env::var("STATIC_DIR").wrap_err("reading STATIC_DIR environement variable")?;
@@ -44,6 +44,7 @@ async fn main() -> Result<()> {
         .service(HelloService);
 
     let router = Router::new()
+        .layer(DatabaseLayer)
         .route("/hello", hello)
         .route("/static", StaticFile::new(static_dir)?);
 

@@ -1,7 +1,4 @@
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-};
+use std::{any::TypeId, collections::HashMap};
 
 use tokio::sync::RwLock;
 
@@ -39,8 +36,8 @@ impl TypedMap {
     {
         let categorie = TypeId::of::<C>();
 
-        let mut map = self.map.read().await;
-        let value = map.get(&categorie).map(|table| table.get(&key)).flatten();
+        let map = self.map.read().await;
+        let value = map.get(&categorie).and_then(|table| table.get(&key));
 
         callback(value);
     }
@@ -49,9 +46,9 @@ impl TypedMap {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Value {
     String(String),
-    u64(u64),
-    i64(i64),
-    List(Vec<Value>),
+    U64(u64),
+    // I64(i64),
+    // List(Vec<Value>),
     Empty,
 }
 
@@ -59,6 +56,14 @@ impl Value {
     pub fn as_string(&self) -> Option<&String> {
         if let Value::String(s) = self {
             Some(s)
+        } else {
+            None
+        }
+    }
+
+    pub fn u64(&self) -> Option<u64> {
+        if let Value::U64(s) = self {
+            Some(*s)
         } else {
             None
         }

@@ -6,13 +6,16 @@ use bytes::Bytes;
 use color_eyre::eyre::Report;
 use http::uri::PathAndQuery;
 use http::{Request, Response, StatusCode, Uri};
+use tower::Layer;
+use tower::layer::util::{Identity, Stack};
 use tower::{Service, util::BoxCloneService};
 
 use crate::utils::basic_response;
 
 type RouteService<Req, Res, Err> = BoxCloneService<Req, Res, Err>;
 
-pub struct Router<Req, Res, Err> {
+pub struct Router<L, Req, Res, Err> {
+    layer: L,
     routes: Vec<Route<Req, Res, Err>>,
 }
 
@@ -20,12 +23,16 @@ struct Route<Req, Res, Err> {
     path: String,
     service: RouteService<Req, Res, Err>,
 }
-
-impl<Req, Res, Err> Router<Req, Res, Err> {
+impl<Req, Res, Err> Router<Identity, Req, Res, Err> {
     pub fn new() -> Self {
-        Self { routes: Vec::new() }
+        Self {
+            layer: Identity::new(),
+            routes: Vec::new(),
+        }
     }
+}
 
+impl<L, Req, Res, Err> Router<L, Req, Res, Err> {
     pub fn route<U, S, F>(mut self, uri: U, service: S) -> Self
     where
         U: Into<String>,
@@ -42,9 +49,20 @@ impl<Req, Res, Err> Router<Req, Res, Err> {
         self.routes.push(route);
         self
     }
+
+    pub fn layer<T>(self, layer: T) -> Router<Stack<T, L>, Req, Res, Err> {
+        Router {
+            layer: Stack::new(layer, self.layer),
+            routes: self.routes,
+        }
+    }
 }
 
-impl<B> Service<Request<B>> for Router<Request<B>, Response<Bytes>, Report> {
+impl<L, S, B> Service<Request<B>> for Router<L, Request<B>, Response<Bytes>, Report>
+where
+    L: Layer<RouteService<Request<B>, Response<Bytes>, Report>, Service = S> + Clone,
+    S: Service<Request<B>, Response = Response<Bytes>, Error = Report>,
+{
     type Response = Response<Bytes>;
 
     type Error = Report;
@@ -90,6 +108,8 @@ impl<B> Service<Request<B>> for Router<Request<B>, Response<Bytes>, Report> {
             }
         });
 
+        let layer = self.layer.clone();
+
         let service = route.map(|route| {
             let cloned_service = route.service.clone();
             mem::replace(&mut route.service, cloned_service)
@@ -97,16 +117,23 @@ impl<B> Service<Request<B>> for Router<Request<B>, Response<Bytes>, Report> {
 
         async move {
             match service {
-                Some(mut service) => service.call(req).await,
+                Some(service) => {
+                    let mut service = layer.layer(service);
+                    Service::call(&mut service, req).await
+                }
                 None => Ok(basic_response(StatusCode::NOT_FOUND)),
             }
         }
     }
 }
 
-impl<Req, Res, Err> Clone for Router<Req, Res, Err> {
+impl<L, Req, Res, Err> Clone for Router<L, Req, Res, Err>
+where
+    L: Clone,
+{
     fn clone(&self) -> Self {
         Self {
+            layer: self.layer.clone(),
             routes: self.routes.clone(),
         }
     }

@@ -6,7 +6,7 @@ use http::{Request, Response, StatusCode};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tower::{Service, ServiceBuilder};
-use tracing::{Instrument, Span, error, info, info_span, trace};
+use tracing::{Instrument, Span, error, info_span, trace};
 
 use crate::error::ServerError;
 use crate::services::ContentLengthLayer;
