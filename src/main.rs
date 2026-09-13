@@ -2,20 +2,22 @@
 #![feature(trim_prefix_suffix)]
 #![feature(normalize_lexically)]
 #![warn(clippy::pedantic)]
+#![allow(warnings)]
 
 use color_eyre::{Result, eyre::Context};
 use dotenvy::dotenv;
 use tokio::net::TcpListener;
+use tower::ServiceBuilder;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use crate::services::{HelloService, Router, StaticFile};
+use crate::services::{DatabaseLayer, HelloService, Router, StaticFile};
 
 mod app;
 mod config;
 mod error;
-mod multi_map;
 mod services;
+mod typed_map;
 mod utils;
 
 #[tokio::main]
@@ -37,8 +39,12 @@ async fn main() -> Result<()> {
     let static_dir =
         std::env::var("STATIC_DIR").wrap_err("reading STATIC_DIR environement variable")?;
 
+    let hello = ServiceBuilder::new()
+        .layer(DatabaseLayer)
+        .service(HelloService);
+
     let router = Router::new()
-        .route("/hello", HelloService)
+        .route("/hello", hello)
         .route("/static", StaticFile::new(static_dir)?);
 
     app::run(listener, router).await?;

@@ -6,7 +6,7 @@ use http::{Request, Response, StatusCode};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tower::{Service, ServiceBuilder};
-use tracing::{Instrument, Span, error, info, info_span};
+use tracing::{Instrument, Span, error, info, info_span, trace};
 
 use crate::error::ServerError;
 use crate::services::ContentLengthLayer;
@@ -28,7 +28,7 @@ where
         let span = info_span!("client", addr = %client_addr);
         let _guard = span.enter();
 
-        info!("Open connection");
+        trace!("Open connection");
 
         tokio::spawn(serve(client, service.clone()).instrument(Span::current()));
     }
@@ -49,7 +49,7 @@ where
         match client_read.read_buf(&mut blank_buf).await {
             // socket closed
             Ok(0) => {
-                info!("Close connection");
+                trace!("Close connection");
                 return Ok::<_, color_eyre::Report>(());
             }
             Ok(_) => {}

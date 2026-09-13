@@ -91,17 +91,9 @@ impl<B> Service<Request<B>> for Router<Request<B>, Response<Bytes>, Report> {
         });
 
         let service = route.map(|route| {
-            let cloned = route.service.clone();
-            mem::replace(&mut route.service, cloned)
+            let cloned_service = route.service.clone();
+            mem::replace(&mut route.service, cloned_service)
         });
-
-        // let mut serice = match route {
-        //     Some(route) => {
-        //     }
-        //     None => {
-        //         todo!()
-        //     }
-        // };
 
         async move {
             match service {
