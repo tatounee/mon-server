@@ -11,7 +11,6 @@ use tracing::{Instrument, Span, error, info_span, trace};
 use crate::error::ServerError;
 use crate::services::ContentLengthLayer;
 use crate::services::serde::{HttpSerdeLayer, serialize};
-// use crate::services::{ContentLengthLayer, HttpSerdeLayer};
 use crate::utils::basic_response;
 
 pub async fn run<S, F>(tcp: TcpListener, service: S) -> Result<()>
@@ -37,8 +36,6 @@ where
 async fn serve<S>(mut client: TcpStream, service: S) -> Result<()>
 where
     S: Service<Request<BytesMut>, Response = Response<Bytes>, Error = Report> + Clone,
-    // Res: Into<Bytes>,
-    // Err: Debug,
 {
     let (mut client_read, mut client_write) = client.split();
 

@@ -6,14 +6,18 @@
 
 use color_eyre::{Result, eyre::Context};
 use dotenvy::dotenv;
-use tokio::net::TcpListener;
+use tokio::{fs::File, net::TcpListener};
 use tower::ServiceBuilder;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use crate::services::{DatabaseLayer, HelloService, Router, StaticFile};
+use crate::{
+    body::Body,
+    services::{DatabaseLayer, HelloService, Router, StaticFile},
+};
 
 mod app;
+mod body;
 mod config;
 mod error;
 mod services;
