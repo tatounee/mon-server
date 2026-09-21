@@ -1,20 +1,26 @@
-use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
+use std::{fmt, mem};
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
 use http_body::{Body as BodyTrait, Frame, SizeHint};
 
 use color_eyre::Report;
-use pin_project_lite::pin_project;
-use tokio::fs::File;
-use tokio::io::{AsyncRead, ReadBuf};
 
 pub enum Body {
     Static(Bytes),
     Stream(BoxStream<'static, Bytes>),
+}
+
+impl fmt::Debug for Body {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Static(arg0) => f.debug_tuple("Static").field(arg0).finish(),
+            Self::Stream(_) => f.debug_tuple("Stream").finish(),
+        }
+    }
 }
 
 impl BodyTrait for Body {
@@ -61,33 +67,5 @@ impl BodyTrait for Body {
     fn is_end_stream(&self) -> bool {
         let size_hint = self.size_hint();
         size_hint.upper() == Some(0)
-    }
-}
-
-async fn f(path: &str) -> Body {
-    let file = File::open(path).await.unwrap();
-    let stream = StreamFile { file };
-
-    Body::Stream(stream.boxed())
-}
-
-pin_project! {
-    struct StreamFile {
-        #[pin]
-       file: File
-    }
-}
-
-impl Stream for StreamFile {
-    type Item = Bytes;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-
-        let mut buf = BytesMut::with_capacity(4096);
-        let read_buf = &mut ReadBuf::new(&mut buf);
-        ready!(this.file.poll_read(cx, read_buf)).unwrap();
-
-        Poll::Ready(Some(buf.freeze()))
     }
 }

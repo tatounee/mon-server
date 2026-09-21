@@ -5,13 +5,13 @@ use color_eyre::eyre::Report;
 use http::{Method, Request, Response};
 use tower::Service;
 
-use crate::{services::DbHandler, typed_map::Value};
+use crate::{body::Body, services::DbHandler, typed_map::Value};
 
 #[derive(Clone)]
 pub struct HelloService;
 
 impl Service<Request<BytesMut>> for HelloService {
-    type Response = Response<Bytes>;
+    type Response = Response<Body>;
 
     type Error = Report;
 
@@ -36,7 +36,7 @@ impl Service<Request<BytesMut>> for HelloService {
                 let body = format!("Get {name}");
                 Response::builder()
                     .status(200)
-                    .body(Bytes::from(body))
+                    .body(Body::Static(Bytes::from(body)))
                     .map_err(Report::new)
             } else {
                 if let Some(db) = req.extensions().get::<DbHandler>() {
@@ -50,14 +50,16 @@ impl Service<Request<BytesMut>> for HelloService {
                         let body = format!("Hello {}, how are you ?", name.as_string().unwrap());
                         return Response::builder()
                             .status(200)
-                            .body(Bytes::from(body))
+                            .body(Body::Static(Bytes::from(body)))
                             .map_err(Report::new);
                     }
                 }
 
                 Response::builder()
                     .status(200)
-                    .body(Bytes::from_static(b"Don't you have any name ?"))
+                    .body(Body::Static(Bytes::from_static(
+                        b"Don't you have any name ?",
+                    )))
                     .map_err(Report::new)
             }
         }

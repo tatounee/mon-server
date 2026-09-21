@@ -6,15 +6,12 @@
 
 use color_eyre::{Result, eyre::Context};
 use dotenvy::dotenv;
-use tokio::{fs::File, net::TcpListener};
+use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-use crate::{
-    body::Body,
-    services::{DatabaseLayer, HelloService, Router, StaticFile},
-};
+use crate::services::{CounterService, DatabaseLayer, HelloService, Router, StaticFile};
 
 mod app;
 mod body;
@@ -50,6 +47,7 @@ async fn main() -> Result<()> {
     let router = Router::new()
         .layer(DatabaseLayer)
         .route("/hello", hello)
+        .route("/counter", CounterService)
         .route("/static", StaticFile::new(static_dir)?);
 
     app::run(listener, router).await?;

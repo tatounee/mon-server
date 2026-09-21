@@ -1,6 +1,7 @@
-use bytes::Bytes;
 use http::{HeaderValue, Response, header};
 use tower::{Layer, Service};
+
+use crate::body::Body;
 
 pub struct ContentLength<S> {
     inner: S,
@@ -8,9 +9,9 @@ pub struct ContentLength<S> {
 
 impl<Req, S> Service<Req> for ContentLength<S>
 where
-    S: Service<Req, Response = Response<Bytes>>,
+    S: Service<Req, Response = Response<Body>>,
 {
-    type Response = Response<Bytes>;
+    type Response = Response<Body>;
 
     type Error = S::Error;
 
@@ -28,11 +29,13 @@ where
         async move {
             let mut res = res.await?;
 
-            let lenght = res.body().len();
+            if let Body::Static(body) = res.body() {
+                let lenght = body.len();
 
-            *res.headers_mut()
-                .entry(header::CONTENT_LENGTH)
-                .or_insert(HeaderValue::from_static("")) = HeaderValue::from(lenght);
+                *res.headers_mut()
+                    .entry(header::CONTENT_LENGTH)
+                    .or_insert(HeaderValue::from_static("")) = HeaderValue::from(lenght);
+            }
 
             Ok(res)
         }

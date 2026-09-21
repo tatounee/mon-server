@@ -6,7 +6,7 @@ use http::{Method, Request, Response, StatusCode, Uri};
 use tokio::{fs::File, io::AsyncReadExt};
 use tower::Service;
 
-use crate::{services::DbHandler, typed_map::Value, utils::basic_response};
+use crate::{body::Body, services::DbHandler, typed_map::Value, utils::basic_response};
 
 /// How much room is reserved before each read when the file size is unknown
 /// (or when the file grew past the size reported by its metadata).
@@ -45,7 +45,7 @@ impl StaticFile {
 }
 
 impl<B> Service<Request<B>> for StaticFile {
-    type Response = Response<Bytes>;
+    type Response = Response<Body>;
 
     type Error = Report;
 
@@ -76,7 +76,7 @@ impl<B> Service<Request<B>> for StaticFile {
                     let body = format!("Fail {new_fail} times");
                     return Response::builder()
                         .status(200)
-                        .body(Bytes::from(body))
+                        .body(Body::Static(Bytes::from(body)))
                         .map_err(Report::new);
                 }
 
@@ -88,7 +88,7 @@ impl<B> Service<Request<B>> for StaticFile {
             if !path.starts_with(root) {
                 return Ok(Response::builder()
                     .status(StatusCode::FORBIDDEN)
-                    .body(Bytes::new())
+                    .body(Body::Static(Bytes::new()))
                     .unwrap());
             }
 
@@ -125,7 +125,7 @@ impl<B> Service<Request<B>> for StaticFile {
 
             Response::builder()
                 .status(StatusCode::OK)
-                .body(buf.freeze())
+                .body(Body::Static(buf.freeze()))
                 .map_err(Report::new)
         }
     }

@@ -2,7 +2,6 @@ use std::mem;
 use std::str::FromStr;
 use std::task::Poll;
 
-use bytes::Bytes;
 use color_eyre::eyre::Report;
 use http::uri::PathAndQuery;
 use http::{Request, Response, StatusCode, Uri};
@@ -10,6 +9,7 @@ use tower::Layer;
 use tower::layer::util::{Identity, Stack};
 use tower::{Service, util::BoxCloneService};
 
+use crate::body::Body;
 use crate::utils::basic_response;
 
 type RouteService<Req, Res, Err> = BoxCloneService<Req, Res, Err>;
@@ -58,12 +58,12 @@ impl<L, Req, Res, Err> Router<L, Req, Res, Err> {
     }
 }
 
-impl<L, S, B> Service<Request<B>> for Router<L, Request<B>, Response<Bytes>, Report>
+impl<L, S, B> Service<Request<B>> for Router<L, Request<B>, Response<Body>, Report>
 where
-    L: Layer<RouteService<Request<B>, Response<Bytes>, Report>, Service = S> + Clone,
-    S: Service<Request<B>, Response = Response<Bytes>, Error = Report>,
+    L: Layer<RouteService<Request<B>, Response<Body>, Report>, Service = S> + Clone,
+    S: Service<Request<B>, Response = Response<Body>, Error = Report>,
 {
-    type Response = Response<Bytes>;
+    type Response = Response<Body>;
 
     type Error = Report;
 
