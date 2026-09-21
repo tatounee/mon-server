@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::task::Poll;
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use color_eyre::eyre::{ContextCompat, Report, WrapErr};
 use http::{HeaderName, HeaderValue, Method, Request, Response, Uri, Version};
 use httparse::{EMPTY_HEADER, Request as ParsedRequest, Status};
@@ -15,7 +15,7 @@ pub struct HttpDeserialize<S> {
 
 impl<'a, S, B> Service<&'a mut BytesMut> for HttpDeserialize<S>
 where
-    S: Service<Request<BytesMut>, Error = Report, Response = Response<B>>,
+    S: Service<Request<Bytes>, Error = Report, Response = Response<B>>,
 {
     type Response = Response<B>;
 
@@ -28,22 +28,9 @@ where
     }
 
     fn call(&mut self, req_buf: &'a mut BytesMut) -> Self::Future {
-        // TODO: Utiliser Bytes::from_owner
         let inner = parse(req_buf).map(|request| self.inner.call(request));
 
-        async move {
-            inner?.await
-            // let mut headers = serialize_headers(&response)?;
-
-            // match response.into_body() {
-            //     Body::Static(bytes) => {
-            //         headers.extend_from_slice(&bytes);
-
-            //         Ok(headers.freeze())
-            //     }
-            //     Body::Stream(pin) => todo!(),
-            // }
-        }
+        async move { inner?.await }
     }
 }
 
@@ -57,7 +44,7 @@ impl<S> Layer<S> for HttpDeserializeLayer {
     }
 }
 
-fn parse(buf: &mut BytesMut) -> Result<Request<BytesMut>, Report> {
+fn parse(buf: &mut BytesMut) -> Result<Request<Bytes>, Report> {
     let mut headers = [EMPTY_HEADER; 64];
     let mut parsed = ParsedRequest::new(&mut headers);
     let status = parsed.parse(buf)?;
@@ -67,13 +54,13 @@ fn parse(buf: &mut BytesMut) -> Result<Request<BytesMut>, Report> {
     };
 
     let mut request = request2request(&parsed)?;
-    let body = buf.split_off(cnt);
+    let body = buf.split_off(cnt).freeze();
     *request.body_mut() = body;
 
     Ok(request)
 }
 
-fn request2request(request: &ParsedRequest<'_, '_>) -> Result<Request<BytesMut>, Report> {
+fn request2request(request: &ParsedRequest<'_, '_>) -> Result<Request<Bytes>, Report> {
     let method = request
         .method
         .context("missing method in request2request")
@@ -114,7 +101,7 @@ fn request2request(request: &ParsedRequest<'_, '_>) -> Result<Request<BytesMut>,
         .method(method)
         .uri(uri)
         .version(version)
-        .body(BytesMut::new())
+        .body(Bytes::new())
         .wrap_err("building request in request2request")?;
 
     request.headers_mut().extend(headers);

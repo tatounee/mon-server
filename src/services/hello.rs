@@ -1,6 +1,6 @@
 use std::task::Poll;
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use color_eyre::eyre::Report;
 use http::{Method, Request, Response};
 use tower::Service;
@@ -10,7 +10,7 @@ use crate::{body::Body, services::DbHandler, typed_map::Value};
 #[derive(Clone)]
 pub struct HelloService;
 
-impl Service<Request<BytesMut>> for HelloService {
+impl Service<Request<Bytes>> for HelloService {
     type Response = Response<Body>;
 
     type Error = Report;
@@ -21,7 +21,7 @@ impl Service<Request<BytesMut>> for HelloService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Request<BytesMut>) -> Self::Future {
+    fn call(&mut self, req: Request<Bytes>) -> Self::Future {
         async move {
             if req.method() == Method::POST {
                 let name = str::from_utf8(req.body())

@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use color_eyre::Result;
 use color_eyre::eyre::Report;
 use futures::{future, stream::StreamExt};
@@ -18,7 +18,7 @@ use crate::utils::basic_response;
 
 pub async fn run<S, F>(tcp: TcpListener, service: S) -> Result<()>
 where
-    S: Service<Request<BytesMut>, Response = Response<Body>, Error = Report, Future = F>
+    S: Service<Request<Bytes>, Response = Response<Body>, Error = Report, Future = F>
         + Clone
         + Send
         + 'static,
@@ -38,7 +38,7 @@ where
 
 async fn serve<S>(mut client: TcpStream, service: S) -> Result<()>
 where
-    S: Service<Request<BytesMut>, Response = Response<Body>, Error = Report> + Clone,
+    S: Service<Request<Bytes>, Response = Response<Body>, Error = Report> + Clone,
 {
     let (mut client_read, mut client_write) = client.split();
 

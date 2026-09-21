@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
 
     let chunks: [&str; 5] = [
-        "POST / HTTP/1.1\r\n",
+        "POST /hello HTTP/1.1\r\n",
         "Host: [::1]:8800\r\n",
         "User-Ag",
         "ent: rust\r\n",
